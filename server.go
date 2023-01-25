@@ -6,9 +6,9 @@ import (
 )
 
 func main() {
-	fs := http.FileServer(http.Dir("./static/"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
-
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs.ServeHTTP())
+	//Create handler for test.html to run the file and shit
 	fmt.Println("Server is running on port 8080")
 
 	// Start server on port specified above
