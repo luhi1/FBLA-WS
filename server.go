@@ -8,13 +8,14 @@ import (
 
 var tplJoe = template.Must(template.ParseFiles("joe.html"))
 var tplIndex = template.Must(template.ParseFiles("index.html"))
+var errIndex = template.Must(template.ParseFiles("404.html"))
 
 func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	http.HandleFunc("/joe", joeHandler)
-	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/joe", Handler)
+	http.HandleFunc("/", Handler)
 
 	//Start server run, files, and other shit.
 	fmt.Println("Server is running on port 8080")
@@ -24,14 +25,17 @@ func main() {
 	}
 }
 
-func joeHandler(w http.ResponseWriter, r *http.Request) {
-	tplJoe.Execute(w, nil)
-}
+func Handler(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.String() {
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	tplIndex.Execute(w, nil)
-}
+	case "/":
+		tplIndex.Execute(w, nil)
 
-/*
-	Add error handling and checks to make sure you on the right url (index) before handling.
-*/
+	case "/joe":
+		tplJoe.Execute(w, nil)
+
+	default:
+		errIndex.Execute(w, nil)
+
+	}
+}
