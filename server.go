@@ -45,7 +45,7 @@ func tplExec(w http.ResponseWriter, r *http.Request, request TemplateRequests) {
 	if r.URL.String() == request.index {
 		err = temp.Execute(w, request.data)
 	} else {
-		err = temp.Execute(w, nil)
+		err = tplErr.Execute(w, nil)
 	}
 
 	if err != nil {
