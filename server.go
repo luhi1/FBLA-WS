@@ -5,20 +5,22 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"html/template"
 	"net/http"
-	"strings"
+	"strconv"
 )
 
 type UserInformation struct {
-	Username string
-	Hash     string
+	name          string
+	grade         uint8
+	studentNumber uint32
+	password      string
 }
 
 //As the project develops, determine whether this struct is required.
 //If not, merge into TemplateRequests struct
 
 type TemplateRequests struct {
-	data  UserInformation
-	index string
+	data     UserInformation
+	filename string
 }
 
 var tplErr = template.Must(template.ParseFiles("404.html"))
@@ -28,8 +30,9 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
-	http.HandleFunc("/joe", joeHandler)
-	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/", loginHandler)
+	http.HandleFunc("/signup", signupHandler)
+	http.HandleFunc("/home", homeHandler)
 
 	fmt.Println("Server is running on port 8080")
 	err := http.ListenAndServe(":8080", nil)
@@ -38,35 +41,79 @@ func main() {
 	}
 }
 
-func tplExec(w http.ResponseWriter, r *http.Request, request TemplateRequests) {
-	var err error = nil
-	temp := template.Must(template.ParseFiles(strings.TrimPrefix(request.index, "/") + ".html"))
+func tplExec(w http.ResponseWriter, request TemplateRequests) {
+	temp := template.Must(template.ParseFiles(request.filename))
 
-	if r.URL.String() == request.index {
-		err = temp.Execute(w, request.data)
-	} else {
-		err = tplErr.Execute(w, nil)
-	}
-
+	err := temp.Execute(w, request.data)
 	if err != nil {
 		return
 	}
 }
 
-func joeHandler(w http.ResponseWriter, r *http.Request) {
-	fullRequest := TemplateRequests{
-		UserInformation{"abcde", hashPswd("abcde")},
-		"/joe",
+func errorTplExec(w http.ResponseWriter) {
+	err := tplErr.Execute(w, nil)
+	if err != nil {
+		return
 	}
-	tplExec(w, r, fullRequest)
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	fullRequest := TemplateRequests{UserInformation{}, "login.html"}
+
+	if r.URL.String() == "/" {
+		tplExec(w, fullRequest)
+	} else {
+		errorTplExec(w)
+	}
+}
+
+func signupHandler(w http.ResponseWriter, r *http.Request) {
 	fullRequest := TemplateRequests{
 		UserInformation{},
-		"/index",
+		"signup.html",
 	}
-	tplExec(w, r, fullRequest)
+
+	if r.URL.String() == "/signup" {
+		tplExec(w, fullRequest)
+	} else {
+		errorTplExec(w)
+	}
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+
+	fullRequest := TemplateRequests{UserInformation{}, "login.html"}
+	if r.Method == http.MethodPost {
+		err := r.ParseForm()
+		if err != nil {
+			return
+		}
+		idNumber, err := strconv.Atoi(r.FormValue("studentNumber"))
+
+		if err != nil {
+			return
+		}
+
+		fullRequest = TemplateRequests{
+			data: UserInformation{
+				name:          "Michael",
+				grade:         10,
+				studentNumber: uint32(idNumber),
+				password:      hashPswd(r.FormValue("password")),
+			},
+			filename: "home.html",
+		}
+		//Queries go here
+
+		//TODO: error is with rendering the template, the parsing of the form itself works
+	}
+
+	if r.URL.String() == "/home" {
+		tplExec(w, fullRequest)
+	} else {
+		errorTplExec(w)
+	}
+
 }
 
 func hashPswd(pwd string) string {
