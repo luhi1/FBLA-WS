@@ -8,22 +8,17 @@ import (
 	"strconv"
 )
 
+// UserInformation Template variable names must be capitalized
 type UserInformation struct {
-	name          string
-	grade         uint8
-	studentNumber uint32
-	password      string
+	Name          string
+	Grade         uint8
+	StudentNumber uint32
+	Password      string
+	Invalid       bool
 }
 
-//As the project develops, determine whether this struct is required.
-//If not, merge into TemplateRequests struct
-
-type TemplateRequests struct {
-	data     UserInformation
-	filename string
-}
-
-var tplErr = template.Must(template.ParseFiles("404.html"))
+var userInfo = UserInformation{}
+var tplErr = template.Must(template.ParseFiles("404.gohtml"))
 
 // Start server run, files, and other shit.
 func main() {
@@ -33,6 +28,7 @@ func main() {
 	http.HandleFunc("/", loginHandler)
 	http.HandleFunc("/signup", signupHandler)
 	http.HandleFunc("/home", homeHandler)
+	http.HandleFunc("/logout", logoutHandler)
 
 	fmt.Println("Server is running on port 8080")
 	err := http.ListenAndServe(":8080", nil)
@@ -41,15 +37,16 @@ func main() {
 	}
 }
 
-func tplExec(w http.ResponseWriter, request TemplateRequests) {
-	temp := template.Must(template.ParseFiles(request.filename))
+func tplExec(w http.ResponseWriter, filename string) {
+	temp := template.Must(template.ParseFiles(filename))
 
-	err := temp.Execute(w, request.data)
+	err := temp.Execute(w, userInfo)
 	if err != nil {
 		return
 	}
 }
 
+// Could use this to display error info later on, not limited to just 404s.
 func errorTplExec(w http.ResponseWriter) {
 	err := tplErr.Execute(w, nil)
 	if err != nil {
@@ -58,60 +55,65 @@ func errorTplExec(w http.ResponseWriter) {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	fullRequest := TemplateRequests{UserInformation{}, "login.html"}
-
 	if r.URL.String() == "/" {
-		tplExec(w, fullRequest)
+		if userInfo != (UserInformation{}) && !userInfo.Invalid {
+			tplExec(w, "home.gohtml")
+		} else {
+			tplExec(w, "login.gohtml")
+			userInfo.Invalid = false
+		}
 	} else {
 		errorTplExec(w)
 	}
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
-	fullRequest := TemplateRequests{
-		UserInformation{},
-		"signup.html",
-	}
-
-	if r.URL.String() == "/signup" {
-		tplExec(w, fullRequest)
+	if userInfo != (UserInformation{}) && !userInfo.Invalid {
+		http.Redirect(w, r, "./home", 303)
+		tplExec(w, "home.gohtml")
 	} else {
-		errorTplExec(w)
+		tplExec(w, "signup.gohtml")
+		//dont trust html for valid for results, check it here too
+		//figure out how to do signup once database is connected
 	}
 }
 
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	userInfo = UserInformation{}
+	http.Redirect(w, r, "/", 303)
+}
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 
-	fullRequest := TemplateRequests{UserInformation{}, "login.html"}
 	if r.Method == http.MethodPost {
+
 		err := r.ParseForm()
 		if err != nil {
 			return
 		}
-		idNumber, err := strconv.Atoi(r.FormValue("studentNumber"))
 
+		idNumber, err := strconv.Atoi(r.FormValue("studentNumber"))
 		if err != nil {
 			return
 		}
 
-		fullRequest = TemplateRequests{
-			data: UserInformation{
-				name:          "Michael",
-				grade:         10,
-				studentNumber: uint32(idNumber),
-				password:      hashPswd(r.FormValue("password")),
-			},
-			filename: "home.html",
+		//Make sure that the input fits the requirements (the student number is a uint32 < 9999999)
+		//Check with query in the future
+		if idNumber == 12333 {
+			userInfo = UserInformation{
+				Name:          "Michael",
+				Grade:         10,
+				StudentNumber: uint32(idNumber),
+				Password:      hashPswd(r.FormValue("password")),
+				Invalid:       false,
+			}
+			tplExec(w, "home.gohtml")
+		} else {
+			userInfo.Invalid = true
+			http.Redirect(w, r, "./", 303)
 		}
-		//Queries go here
 
-		//TODO: error is with rendering the template, the parsing of the form itself works
-	}
-
-	if r.URL.String() == "/home" {
-		tplExec(w, fullRequest)
 	} else {
-		errorTplExec(w)
+		http.Redirect(w, r, "./", 303)
 	}
 
 }
